@@ -13,3 +13,29 @@ venv/
 # OS
 .DS_Store
 Thumbs.db
+
+# Airflow logs and runtime files
+airflow/logs/
+airflow/plugins/__pycache__/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Data (will be tracked by DVC instead)
+data/raw/*.csv
+data/cleaned/*.csv
+data/labeled/*.csv
+
+# Environment secrets
+.env
+
+# MLflow
+mlflow/
+*.db
+
+# OS files
+.DS_Store
+Thumbs.db
