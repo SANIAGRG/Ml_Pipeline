@@ -39,3 +39,6 @@ mlflow/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Moddels
+models/
