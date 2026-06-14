@@ -1,0 +1,6 @@
+outs:
+- md5: f9d66f26e0bc8a43b8b1412585b25132.dir
+  size: 4286502632
+  nfiles: 40
+  hash: md5
+  path: headline-classifier
