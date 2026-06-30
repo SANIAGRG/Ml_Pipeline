@@ -80,7 +80,17 @@ services:
     volumes:
       - mlflow_data:/mlflow
     restart: unless-stopped
-
+  api:
+    build: ./api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./models/headline-classifier-mlflow:/app/models/headline-classifier
+    environment:
+      MODEL_PATH: /app/models/headline-classifier
+    depends_on:
+      - mlflow
+    restart: unless-stopped
 
 volumes:
   postgres_data:
