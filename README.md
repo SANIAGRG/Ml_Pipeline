@@ -1,6 +1,6 @@
-# ML Data Pipeline 
+# ML Data Pipeline — End to End
 
-This project is a fully automated machine learning pipeline that scrapes live news headlines from BBC every day, cleans and labels them, trains a text classification model, tracks every experiment, and serves predictions through a REST API. The entire system runs locally on your machine using Docker — no cloud account or paid services required. It was built week by week as a hands-on learning project covering the full spectrum of modern ML engineering, from raw data ingestion all the way to model serving.
+This project is a fully automated machine learning pipeline that scrapes live news headlines from BBC every day, cleans and labels them, trains a text classification model, tracks every experiment, and serves predictions through a REST API. The entire system runs locally on your machine using Docker — no cloud account or paid services required. It was built week by week as a hands-on learning project covering the full spectrum of modern ML engineering, from raw data ingestion all the way to model serving. The project is now complete end to end: a single `docker compose up -d` starts every service, including a live model that serves real predictions.
 
 ---
 
@@ -45,6 +45,7 @@ This project is a fully automated machine learning pipeline that scrapes live ne
           ┌────────────────▼────────────────┐
           │       FastAPI /predict           │
           │  POST text → { label, score }    │
+          │   (now running inside Docker)    │
           └─────────────────────────────────┘
 ```
 
@@ -55,6 +56,24 @@ Every night, an Airflow scheduler triggers a scraping task that pulls the latest
 ## Model Training and Experiment Tracking
 
 Once labeled data is available, a DistilBERT model is fine-tuned on the headlines using the HuggingFace Transformers library. DistilBERT is a compressed version of Google's BERT — 40% smaller, 60% faster, and retaining 97% of the original accuracy — making it practical to train on a laptop CPU in a few minutes. Every training run is tracked with MLflow, which records the hyperparameters used (learning rate, epochs, batch size), the metrics produced (training loss, runtime), and the model artifacts. This makes it possible to compare runs side by side and always know exactly what data and config produced any given model.
+
+---
+
+## Serving Predictions
+
+The trained model is served through a FastAPI application that loads the model once at startup and exposes a `/predict` endpoint. The API runs as its own Docker service, with the trained model files mounted in as a volume so the container always has access to the latest version without being rebuilt. Interactive API documentation is generated automatically and available at `/docs`, where any endpoint can be tested directly from the browser.
+
+```json
+POST /predict
+{ "text": "England win the World Cup final in extra time" }
+
+Response:
+{
+  "label": "sport",
+  "confidence": 0.87,
+  "all_scores": { "news": 0.05, "sport": 0.87, "entertainment": 0.08 }
+}
+```
 
 ---
 
@@ -75,7 +94,7 @@ Once labeled data is available, a DistilBERT model is fine-tuned on the headline
 └──────────────┴─────────────────────────────────┴─────────────────────┘
 ```
 
-All datasets and trained models are versioned with DVC (Data Version Control), which works like Git but for large files. The actual data lives in MinIO — a locally hosted, S3-compatible object store — while Git only tracks tiny pointer files. This means anyone who clones the repo can run `dvc pull` and get the exact dataset that produced any model, without large files ever bloating the repository. The full infrastructure — Airflow, MinIO, MLflow, Postgres, and a FastAPI inference server — is defined in a single `docker-compose.yml` and starts with one command. Every tool in this stack is free and open source.
+All datasets and trained models are versioned with DVC (Data Version Control), which works like Git but for large files. The actual data lives in MinIO — a locally hosted, S3-compatible object store — while Git only tracks tiny pointer files. This means anyone who clones the repo can run `dvc pull` and get the exact dataset that produced any model, without large files ever bloating the repository. The full infrastructure — Airflow, MinIO, MLflow, Postgres, and the FastAPI inference server — is defined in a single `docker-compose.yml` and starts with one command. Every tool in this stack is free and open source.
 
 ---
 
@@ -88,24 +107,47 @@ cd Ml_Pipeline
 
 # 2. Create your .env file with your own credentials (never commit this)
 
-# 3. Start all services
+# 3. Start the data infrastructure
 docker compose up airflow-init   # first time only
-docker compose up -d
+docker compose up -d postgres minio airflow-webserver airflow-scheduler mlflow
 
-# 4. Pull versioned data
+# 4. Create MinIO buckets: dvc-storage, mlflow-artifacts
+#    Open http://localhost:9001
+
+# 5. Pull versioned data
 pip install dvc dvc-s3
 dvc pull
 
-# 5. Train the model
+# 6. Train the model (creates models/headline-classifier-mlflow/)
 pip install transformers torch scikit-learn datasets accelerate mlflow boto3
 python scripts/train_mlflow.py
 
-# 6. Open the UIs
+# 7. Build and start the API (needs the trained model from step 6)
+docker compose up -d --build api
+
+# 8. Open the UIs
 # Airflow  → http://localhost:8080
 # MinIO    → http://localhost:9001
 # MLflow   → http://localhost:5000
 # FastAPI  → http://localhost:8000/docs
 ```
+
+Once a model has been trained at least once, every future `docker compose up -d` brings up all 6 services together, including the API, with no extra steps.
+
+---
+
+## Week by Week Build Log
+
+| Week | What was built | Status |
+|---|---|---|
+| 1 | Docker infrastructure: Postgres, MinIO, Airflow, MLflow | Done |
+| 2 | Scraper and cleaner DAGs (BBC RSS → cleaned CSV) | Done |
+| 3 | Data versioning with DVC + MinIO | Done |
+| 4 | Labeling DAG using weak supervision via URL path | Done |
+| 5 | DistilBERT fine-tuning with HuggingFace | Done |
+| 6 | MLflow experiment tracking and model registry | Done |
+| 7 | FastAPI inference server with /predict endpoint | Done |
+| 8 | Full integration — entire stack runs with one command | Done |
 
 ---
 
